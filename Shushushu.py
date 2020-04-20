@@ -429,48 +429,46 @@ def fact(update: Update, context: CallbackContext):
     update.message.reply_text(cat_fact)
 
 
-@log_action
-@decorator_error
-def sample_recognize(local_file_path):
-    Transcript = ''
+class SpeechToText:
+    def __init__(self, local_file_path):
+        self.local_file_path = local_file_path
 
-    client = speech_v1.SpeechClient()
-
-    language_code = "ru-RU"
-
-    sample_rate_hertz = 48000
-
-    encoding = enums.RecognitionConfig.AudioEncoding.LINEAR16
-    config = {
-        "language_code": language_code,
-        "sample_rate_hertz": sample_rate_hertz,
-        "encoding": encoding,
-    }
-    with io.open(local_file_path, "rb") as f:
-        content = f.read()
-    audio = {"content": content}
-    response = client.recognize(config, audio)
-    for result in response.results:
-        alternative = result.alternatives[0]
-        Transcript = alternative.transcript
-    return Transcript
+    def sample_recognize(self):
+        transcript = ''
+        client = speech_v1.SpeechClient()
+        language_code = "ru-RU"
+        sample_rate_hertz = 48000
+        encoding = enums.RecognitionConfig.AudioEncoding.LINEAR16
+        config = {
+            "language_code": language_code,
+            "sample_rate_hertz": sample_rate_hertz,
+            "encoding": encoding,
+        }
+        with io.open(self.local_file_path, "rb") as f:
+            content = f.read()
+        audio = {"content": content}
+        response = client.recognize(config, audio)
+        for result in response.results:
+            alternative = result.alternatives[0]
+            transcript = alternative.transcript
+        if transcript == '':
+            transcript = 'Не удалось перевести.'
+        return transcript
 
 
 def voice_message(update: Update, context: CallbackContext):
-
     file_info = context.bot.get_file(update.message.voice.file_id)
     file_info.download('VOICE.ogg')
-
     command = [
-        r'Project\ffmpeg\bin\ffmpeg.exe', # путь до ffmpeg.exe
+        r'Project\bin\ffmpeg.exe', # путь до ffmpeg.exe
         '-i', 'VOICE.ogg',
+        '-ar', '48000',
         'VOICE.wav'
     ]
     proc = subprocess.Popen(command)
     proc.wait()
-
-    Transcript = sample_recognize("./VOICE.wav")
-    update.message.reply_text(Transcript)
+    transcript = SpeechToText("./VOICE.wav")
+    update.message.reply_text(transcript.sample_recognize())
     path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'VOICE.wav')
     os.remove(path)
 
