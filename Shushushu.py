@@ -14,7 +14,7 @@ from SpeechToText import *
 
 from telegram import Bot, Update, bot
 from telegram.ext import CallbackContext, CommandHandler, Filters, MessageHandler, Updater
-
+import re
 from pymongo import MongoClient
 
 # Enable logging
@@ -128,6 +128,14 @@ def clear_db(update: Update, context: CallbackContext):
 
 @log_action
 @decorator_error
+def clear_db(update: Update, context: CallbackContext):
+    """clear the whole database including history and all covids"""
+    client.drop_database('ThePyProject')
+    update.message.reply_text('Ready!')
+
+
+@log_action
+@decorator_error
 def admin_settings(update: Update, context: CallbackContext):
     """Send a list of AdminOnly commands"""
     if update.effective_user.first_name =='Meseyoshi':
@@ -156,6 +164,40 @@ def covid(update: Update, context: CallbackContext):
     CovidStats.image_create(CovidStats, data)
     Bot.send_photo(bot, update.message.chat.id, open('source_pack/Covid_statistics.png', 'rb'))
     Bot.send_photo(bot, update.message.chat.id, open('source_pack/Covid_weekly_changes.png', 'rb'))
+
+
+def get_date(date_in):
+    try :
+        y = re.findall(r"\d{4}$", date_in)
+        m = re.findall(r"\d{2}", str(re.findall(r"\.\d{2}\.", date_in)))
+        d = str(int(re.findall(r"^\d{2}", date_in)[0]) - 1)
+        return y, m, d
+    except:
+        try:
+            y = re.findall(r"\d{4}$", date_in)
+            d = str(int(re.findall(r"\d{2}", str(re.findall(r"-\d{2}-", date_in)))[0]) - 1)
+            m = re.findall(r"^\d{2}", date_in)
+            return y, m, d
+        except:
+            return 0
+
+
+@log_action
+@decorator_error
+def covid_chosen_date(update: Update, context: CallbackContext):
+    update.message.reply_text('You\'ll be provided with some covid info by chosen date')
+    a = update.message['text'].replace('/corona_stats', '').strip()
+    d = get_date(a)
+    if d == 0:
+        update.message.reply_text("Sorry, format is incorrect, try call function again!")
+    else:
+        try:
+            data = CovidStats.upload_chosen_date(CovidStats, *d[0], *d[1], d[2])
+            text = CovidStats.top_five(CovidStats, data)
+            update.message.reply_text('Here you can find some statistic about top-5 covid infected regions')
+            update.message.reply_text(text)
+        except:
+            update.message.reply_text('Sorry, something got wrong with it...')
 
 
 @log_action
@@ -237,6 +279,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('history', history))
     updater.dispatcher.add_handler(CommandHandler('settings', admin_settings))
     updater.dispatcher.add_handler(CommandHandler('clean', admin_check_period))
+    updater.dispatcher.add_handler(CommandHandler('clean_db', clear_db))
     updater.dispatcher.add_handler(CommandHandler('fact', fact))
     updater.dispatcher.add_handler(CommandHandler('news', rbc_news))
     updater.dispatcher.add_handler(CommandHandler('covid', covid))
@@ -244,6 +287,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('weather', weather))
     updater.dispatcher.add_handler(CommandHandler('film', film))
     updater.dispatcher.add_handler(CommandHandler('dynamics', corona_stats_dynamics))
+    updater.dispatcher.add_handler(CommandHandler('corona_stats', covid_chosen_date))
 
 
     # on noncommand i.e message - echo the message on Telegram

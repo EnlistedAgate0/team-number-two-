@@ -15,17 +15,27 @@ class CovidStatistics:
 
 
 class CovidStats(CovidStatistics):
-    def upload(self):
-        yesterday = date.today() - timedelta(days=1)
-        y = str(yesterday)[: 4]
-        m = str(yesterday)[5: 7]
-        d = str(yesterday)[8:]
+
+    def upload_chosen_date(self, y, m, d):
+        if len(d) == 1:
+            d = '0' + d
+        url = f'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/' \
+              f'csse_covid_19_data/csse_covid_19_daily_reports/{m}-{d}-{y}.csv'
+        data = pd.read_csv(url).sort_values('Confirmed', ascending=False)
+        data['Province_State'] = data['Province_State'].fillna('')
+        return data
+
+    def upload(self, y=str(date.today() - timedelta(days=1))[:4],
+               m=str(date.today() - timedelta(days=1))[5:7],
+               d=str(date.today() - timedelta(days=1))[8:]):
+
         url = f'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/' \
               f'csse_covid_19_data/csse_covid_19_daily_reports/{m}-{d}-{y}.csv'
         # data = pd.read_csv(url)
         try:
             # data = pd.read_csv(covid_collection.find()).sort_values('Confirmed', ascending=False)
             data = pd.DataFrame(sh.covid_collection_t.find()).sort_values('Confirmed', ascending=False)
+
         except:
             data = pd.read_csv(url).sort_values('Confirmed', ascending=False)
             with open("source_pack/Covid.csv", "wb") as file_c:
@@ -34,7 +44,6 @@ class CovidStats(CovidStatistics):
                 sh.covid_collection_t.insert_many(data.to_dict(orient='records'))
         data['Province_State'] = data['Province_State'].fillna('')
         return data
-
 
     def top_five(self, data):
         top_5 = data[['Province_State', 'Country_Region', 'Last_Update', 'Confirmed', 'Deaths', 'Recovered']].iloc[:5]
